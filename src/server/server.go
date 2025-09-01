@@ -1,24 +1,68 @@
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"sync"
+
+	"github.com/Marcelosgc1/ConcorrenciaConectividade_Problema1/common"
 )
 
-type player struct{
 
-
+type IdManager struct{
+    mutex sync.Mutex
+    count int
+    clientMap map[int]Player
+}
+type Player struct{
+    connection net.Conn
+    id int
 }
 
 
 
 
-var clientMap = make(map[string]net.Conn)
 
+func (im *IdManager) addPlayer(connect net.Conn) int {
+    im.mutex.Lock()
+    defer im.mutex.Unlock()
+
+    im.count += 1
+    im.clientMap[im.count] = Player{
+        connection: connect,
+        id: im.count,
+    }
+
+    return im.count
+}
+
+func (im *IdManager) loginPlayer(connect net.Conn, login int) (int, int) {
+    im.mutex.Lock()
+    defer im.mutex.Unlock()
+
+    player, ok := im.clientMap[login]
+    if ok && player.connection == nil{
+        player.connection = connect
+        im.clientMap[login] = player
+    }else if player.connection != nil {
+        return 0,1
+    }else {
+        return 0,2
+    }
+
+    return player.id, 0
+}
+
+var im = IdManager{
+        count: 0,
+        clientMap: map[int]Player{},
+    }
+    
 func main() {
     
+
     listener, err := net.Listen("tcp", ":8080")
     if err != nil {
         fmt.Println("Erro ao iniciar servidor:", err)
@@ -41,31 +85,52 @@ func main() {
 }
 
 func handleConnection(conn net.Conn) {
-    defer conn.Close()
-    var state = 1;
-    reader := bufio.NewReader(conn)
 
+    
+    
+    var msg common.Message
+    decoder := json.NewDecoder(conn)
+    encoder := json.NewEncoder(conn)
+    var conectado = 0
+    var id = 0
+    var inputData [5]any
+
+    defer func() {
+        fmt.Println("teste")
+        if id!=0 {
+            fmt.Println("teste2")
+            im.mutex.Lock()
+            p:=im.clientMap[id]
+            p.connection = nil
+            im.clientMap[id]=p
+            im.mutex.Unlock()
+        }
+        fmt.Println(im.clientMap[id].connection)
+        conn.Close()
+    }()
+    
     for {
-        msg, err := reader.ReadString('\n')
-        if err != nil {
-            fmt.Println("Cliente desconectado")
-            return
+        inputData, conectado = common.ReadData(decoder, &msg)
+        if conectado!=0 {
+            break
         }
-        switch state {
-            case 1: 
-                for _,v := range clientMap {
-                    if v != conn {
-                        v.Write([]byte(conn.RemoteAddr().String() + ":" + "\n" + msg + "\n"))
-                    }    
-                }
-            case 2:
+        switch msg.Action {
+        case 0:
+            login := common.ToInt(inputData[0])
+            temp, err := im.loginPlayer(conn, login)
+            conectado = common.SendRequest(encoder, 0, err)
+            id = temp
+        case 1:
+            temp := im.addPlayer(conn)
+            conectado = common.SendRequest(encoder, 0, 1, temp)
+            id = temp
+        case 2:
 
 
         }
-
-        //fmt.Printf("%s:\nMensagem recebida: %s", conn.RemoteAddr().String(), msg)
-        
-        
+        if conectado != 0 {
+            break
+        }
         
     }
 }
