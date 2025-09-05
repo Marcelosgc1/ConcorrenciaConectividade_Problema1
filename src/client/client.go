@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/Marcelosgc1/ConcorrenciaConectividade_Problema1/common"
 )
@@ -14,11 +15,16 @@ import (
 type Player struct{
     State int
 }
+type Game struct{
+    active bool
+    enemyId int
+}
 
 var state = 0
 var sendToServer *json.Encoder
 
 var p = Player{State: 0,}
+var g = Game{active: false, enemyId: 0,}
 
 
 
@@ -40,16 +46,25 @@ func main() {
 
     for {
         switch p.State {
-        case 0:
+        case 0: //login page
             println("0 p/ login")
             println("1 p/ criar usuario")
-            println("2 p/ sair")
+            println("2 p/ ping")
+            println("3 p/ sair")
             login(msg, readFromServer)
         case 1:
-            fmt.Println("Nice")
+            println("0 p/ jogar")
+            println("1 p/ abrir pacote")
+            println("2 p/ ver cartas")
+            println("3 p/ sair")
+            mainPage(msg, readFromServer)
+        case 2:
+            println("====GAME START====")
+            p.State = 1
+            //gamePage(msg, readFromServer)
         }
-        if p.State == 1 {
-            //break
+        if p.State == -1 {
+            break
         }
     }
 
@@ -89,10 +104,44 @@ func login(msg common.Message, dec *json.Decoder) {
         common.SendRequest(sendToServer, state, 1)
         println("Loading...")
         temp,_ := common.ReadData(dec, &msg)
-        fmt.Println("Usuário criado", temp[0])
+        fmt.Println("Usuário criado:", common.ToInt(temp[0]))
         p.State = 1
-    default:
-        fmt.Println("algo")
+    case 2:
+        start := time.Now()
+        common.SendRequest(sendToServer, state, 2)
+        common.ReadData(dec, &msg)
+        fmt.Println("Ping:",time.Since(start).Microseconds(),"µs")
+    case 3:
+        p.State = -1
     }
 }
 
+func mainPage(msg common.Message, dec *json.Decoder) {
+    var input int
+    n, err := fmt.Scanln(&input)
+    if err != nil || n == 0 {
+        return
+    }
+
+    switch input{
+    case 0:
+        fmt.Println("Entrando na fila...")
+        common.SendRequest(sendToServer, state, 3)
+        temp,_:= common.ReadData(dec, &msg)
+        switch msg.Action{
+        case 0:
+            fmt.Println("Partida encontrada contra o jogador: ", common.ToInt(temp[0]), "! Segure seus cintos...")
+            p.State = 2
+        case -1:
+            fmt.Println("Erro crítico ocorreu")
+        }
+    case 1:
+        common.SendRequest(sendToServer, state, 4)
+        println("Loading...")
+        common.ReadData(dec, &msg)
+        fmt.Println("nova carta:", msg.Action)
+        p.State = 1
+    case 3:
+        p.State = -1
+    }
+}
