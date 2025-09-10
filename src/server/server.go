@@ -25,13 +25,28 @@ type BattleQueue struct{
 type Player struct{
     connection net.Conn
     id int
-    inMsg chan int
+    inMsg chan *Games
+    cards []int
 }
 
 
 type Storage struct{
     mutex sync.Mutex
     cards []int
+}
+
+
+type Games struct{
+    p1 int
+    p2 int
+    point1 int
+    point2 int
+    result int //1 ou 2 p/ vencedor, 3 p/ empate e 0 p/ indefinido
+}
+
+type GameHistory struct{
+    mutex sync.Mutex
+    allGames []*Games
 }
 
 
@@ -46,7 +61,7 @@ func (im *IdManager) addPlayer(connect net.Conn) *Player {
     im.clientMap[im.count] = &Player{
         connection: connect,
         id: im.count,
-        inMsg: make(chan int, 1),
+        inMsg: make(chan *Games),
     }
 
     return im.clientMap[im.count]
@@ -104,6 +119,17 @@ func (sto *Storage) openPack() int {
     return x
 }
 
+func (hg *GameHistory) newGame(p1id int, p2id int) *Games {
+    hg.mutex.Lock()
+    defer sto.mutex.Unlock()
+    fmt.Println(sto.cards)
+    newGame := Games{
+        p1: p1id, p2: p2id, point1: 0, point2: 0,result: 0,
+    }
+    hg.allGames = append(hg.allGames, &newGame)
+    return &newGame
+}
+
 
 func setupPacks() []int {
     arr := []int{1, 2, 3, 4, 5}
@@ -130,6 +156,10 @@ var sto = Storage{
     cards: setupPacks(),
 }
     
+var hg = GameHistory{
+    allGames: []*Games{},
+}
+
 func main() {
 
     listener, err := net.Listen("tcp", ":8080")
@@ -160,7 +190,8 @@ func handleConnection(conn net.Conn) {
     encoder := json.NewEncoder(conn)
     var connected = 0
     var ownPlayer *Player
-    var inputData [5]any
+    var inputData []any
+    var currGame *Games
 
     defer func() {
         if ownPlayer!=nil {
@@ -191,24 +222,30 @@ func handleConnection(conn net.Conn) {
             if duo != nil {
                 enemy,_ := im.alertPlayer(duo[0])
                 if enemy.connection != nil {
-                    enemy.inMsg <- ownPlayer.id
-                    connected = common.SendRequest(encoder, 0, 0, enemy.id)
+                    currGame = hg.newGame(ownPlayer.id, enemy.id)
+                    enemy.inMsg <- currGame
+                    connected = common.SendRequest(encoder, 0, 0, enemy.id, 1)
+                    
                 }else {
                     connected = common.SendRequest(encoder, 0, -1)
                 }
             }else {
-                enemyId := <-ownPlayer.inMsg
-                if enemyId == 0 {
-                    fmt.Println("erro crítico")
-                    connected = common.SendRequest(encoder, 0, -1)
-                }else {
-                    connected = common.SendRequest(encoder, 0, 0, enemyId)
-                }
+                currGame = <-ownPlayer.inMsg
+                connected = common.SendRequest(encoder, 0, 0, currGame.p1, 2)
             }
+
         case 4:
             card := sto.openPack()
+            if card!=0 {
+                ownPlayer.cards = append(ownPlayer.cards, card)
+            }
             connected = common.SendRequest(encoder, 0, card)
+        case 5:
+            connected = common.SendRequestList(encoder, 0, 0, ownPlayer.cards)
+        case 6:
+            
         }
+        
         if connected != 0 {
             break
         }

@@ -39,8 +39,36 @@ func SendRequest(encoder *json.Encoder, state int, action int, payload ...int) i
 	return 0
 }
 
-func ReadData(dec *json.Decoder, msg *Message) ([5]any, int) {
-	var temp [5]any
+func SendRequestList(encoder *json.Encoder, state int, action int, newpayload []int) int {
+	var data []byte = nil;
+	var err error
+	
+	data, err = json.Marshal(newpayload)
+	if err != nil {
+		fmt.Println("Erro ao serializar payload:", err)
+		return 1
+	}	
+
+	
+
+	req := Message{
+		Action: action,
+        State:  state,
+		Data:   data,
+	}
+
+	err = encoder.Encode(req)
+	if err != nil {
+		return 2
+		//fmt.Println("Erro ao enviar requisição:", err)
+		//return 2
+	}
+	
+	return 0
+}
+
+func ReadData(dec *json.Decoder, msg *Message) ([]any, int) {
+	var temp []any
 	err := dec.Decode(msg)
 	if err!=nil {
 		return temp, 1

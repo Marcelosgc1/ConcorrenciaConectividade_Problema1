@@ -61,7 +61,7 @@ func main() {
         case 2:
             println("====GAME START====")
             p.State = 1
-            //gamePage(msg, readFromServer)
+            gamePage(msg, readFromServer)
         }
         if p.State == -1 {
             break
@@ -139,8 +139,39 @@ func mainPage(msg common.Message, dec *json.Decoder) {
         common.SendRequest(sendToServer, state, 4)
         println("Loading...")
         common.ReadData(dec, &msg)
-        fmt.Println("nova carta:", msg.Action)
+        if msg.Action==0 {
+            fmt.Println("nova carta: Nenhuma carta disponível")
+        }else {
+            fmt.Println("nova carta:", msg.Action)
+        }
         p.State = 1
+    case 2:
+        common.SendRequest(sendToServer, state, 5)
+        println("Loading...")
+        temp,_:=common.ReadData(dec, &msg)
+        fmt.Println("Minhas cartas:", temp)
+        
+    case 3:
+        p.State = -1
+    }
+}
+
+
+
+func gamePage(msg common.Message, dec *json.Decoder) {
+    var input int
+    n, err := fmt.Scanln(&input)
+    if err != nil || n == 0 {
+        return
+    }
+
+    switch input{
+    case 0:
+        
+    case 1:
+
+    case 2:
+        
     case 3:
         p.State = -1
     }
