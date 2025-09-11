@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"sync"
-    "math/rand"
+
 	"github.com/Marcelosgc1/ConcorrenciaConectividade_Problema1/common"
 )
 
@@ -27,6 +28,7 @@ type Player struct{
     id int
     inMsg chan *Games
     cards []int
+    deck [3]int
 }
 
 
@@ -62,6 +64,7 @@ func (im *IdManager) addPlayer(connect net.Conn) *Player {
         connection: connect,
         id: im.count,
         inMsg: make(chan *Games),
+        cards: make([]int, 0),
     }
 
     return im.clientMap[im.count]
@@ -78,7 +81,9 @@ func (im *IdManager) alertPlayer(id int) (*Player, bool) {
 func (im *IdManager) loginPlayer(connect net.Conn, login int) (*Player, int) {
     im.mutex.Lock()
     defer im.mutex.Unlock()
-
+    if login>im.count {
+        return nil, 2
+    }
     player, ok := im.clientMap[login]
     if ok && player.connection == nil{
         player.connection = connect
@@ -132,7 +137,7 @@ func (hg *GameHistory) newGame(p1id int, p2id int) *Games {
 
 
 func setupPacks() []int {
-    arr := []int{1, 2, 3, 4, 5}
+    arr := []int{1, 2, 3, 4, 5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26}
 
     for i := len(arr) - 1; i > 0; i-- {
         j := rand.Intn(i + 1)
@@ -221,7 +226,7 @@ func handleConnection(conn net.Conn) {
             duo := bq.queuePlayer(ownPlayer.id)
             if duo != nil {
                 enemy,_ := im.alertPlayer(duo[0])
-                if enemy.connection != nil {
+                if enemy.connection != nil && currGame == nil {
                     currGame = hg.newGame(ownPlayer.id, enemy.id)
                     enemy.inMsg <- currGame
                     connected = common.SendRequest(encoder, 0, enemy.id, 1)
@@ -231,7 +236,12 @@ func handleConnection(conn net.Conn) {
                 }
             }else {
                 currGame = <-ownPlayer.inMsg
-                connected = common.SendRequest(encoder, 0, currGame.p1, 2)
+                if currGame == nil {
+                    connected = common.SendRequest(encoder, -1)
+                }else {
+                    connected = common.SendRequest(encoder, 0, currGame.p1, 2)
+                }
+                
             }
 
         case 4:
@@ -243,7 +253,13 @@ func handleConnection(conn net.Conn) {
         case 5:
             connected = common.SendRequestList(encoder, 0, ownPlayer.cards)
         case 6:
-            
+            if len(ownPlayer.cards) <= common.ToInt(inputData[1]){
+                connected = common.SendRequest(encoder, 0, -1)
+                break
+            }
+            ownPlayer.deck[common.ToInt(inputData[0])] = ownPlayer.cards[common.ToInt(inputData[1])]
+        case 7:
+            connected = common.SendRequestList(encoder, 0, ownPlayer.deck[:])
         }
         
         if connected != 0 {
