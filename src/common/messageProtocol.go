@@ -64,7 +64,7 @@ func SendRequestList(encoder *json.Encoder, action int, newpayload []int) int {
 	return 0
 }
 
-func ReadData(dec *json.Decoder, msg *Message) ([]any, int) {
+func ReadData(dec *json.Decoder, msg *Message, info ...int) ([]any, int) {
 	var temp []any
 	err := dec.Decode(msg)
 	if err!=nil {

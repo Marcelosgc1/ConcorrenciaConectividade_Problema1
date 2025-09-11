@@ -56,12 +56,16 @@ func main() {
             println("0 p/ jogar")
             println("1 p/ abrir pacote")
             println("2 p/ ver cartas")
-            println("3 p/ sair")
+            println("3 p/ ver deck")
+            println("4 p/ escolher deck")
+            println("5 p/ sair")
             mainPage(msg, readFromServer)
         case 2:
             println("====GAME START====")
             p.State = 1
             gamePage(msg, readFromServer)
+        case 3:
+            println("SELECIONE 3 CARTAS!")
         }
         if p.State == -1 {
             break
@@ -126,6 +130,12 @@ func mainPage(msg common.Message, dec *json.Decoder) {
     switch input{
     case 0:
         fmt.Println("Entrando na fila...")
+        common.SendRequest(sendToServer, 7)
+        deck,_:= common.ReadData(dec, &msg)
+        if common.ToInt(deck[0])==0 || common.ToInt(deck[1])==0 || common.ToInt(deck[2])==0 {
+            fmt.Println("Monte seu deck antes de jogar!")
+            break
+        }
         common.SendRequest(sendToServer, 3)
         temp,_:= common.ReadData(dec, &msg)
         switch msg.Action{
@@ -147,12 +157,50 @@ func mainPage(msg common.Message, dec *json.Decoder) {
         p.State = 1
     case 2:
         common.SendRequest(sendToServer, 5)
-        println("Loading...")
         temp,_:=common.ReadData(dec, &msg)
         fmt.Println("Minhas cartas:", temp)
-        
     case 3:
+        common.SendRequest(sendToServer, 7)
+        println("Loading...")
+        temp,_:=common.ReadData(dec, &msg)
+        if common.ToInt(temp[0])!=0 {
+            fmt.Println("Meu deck:", temp)
+        }else {
+            fmt.Println("Você não montou seu deck.")
+        }
+    case 4:
+        var cards int
+        var deck int = 0
+        common.SendRequest(sendToServer, 5)
+        temp,_:=common.ReadData(dec, &msg)
+        if len(temp)<3 {
+            fmt.Println("Compre mais cartas para montar um pacote!")
+            break
+        }
+        for deck != 3{
+            fmt.Println("Minhas cartas:", temp)
+            fmt.Println("insira o indice: ")
+            n, err := fmt.Scanln(&cards)
+            if err != nil || n == 0 {
+                return
+            }
+            if cards>=len(temp) {
+                fmt.Println("Indice invalido")
+                continue
+            }else if temp[cards]==-1 {
+                fmt.Println("Já escolhido!!")
+            }else {
+                temp[cards] = -1
+                common.SendRequest(sendToServer, 6, deck, cards)
+                deck += 1
+            }
+        }
+
+        
+    case 5:
         p.State = -1
+    case 6:
+        common.SendRequest(sendToServer, 6)
     }
 }
 
