@@ -88,7 +88,7 @@ func login(msg common.Message, dec *json.Decoder) {
         if err != nil || n == 0 {
             return
         }
-        common.SendRequest(sendToServer, state, 0, login)
+        common.SendRequest(sendToServer, 0, login)
         println("Loading...")
         common.ReadData(dec, &msg)
         switch msg.Action{
@@ -101,14 +101,14 @@ func login(msg common.Message, dec *json.Decoder) {
             fmt.Println("Usuário não encontrado.")
         }
     case 1:
-        common.SendRequest(sendToServer, state, 1)
+        common.SendRequest(sendToServer, 1)
         println("Loading...")
         temp,_ := common.ReadData(dec, &msg)
         fmt.Println("Usuário criado:", common.ToInt(temp[0]))
         p.State = 1
     case 2:
         start := time.Now()
-        common.SendRequest(sendToServer, state, 2)
+        common.SendRequest(sendToServer, 2)
         common.ReadData(dec, &msg)
         fmt.Println("Ping:",time.Since(start).Microseconds(),"µs")
     case 3:
@@ -126,7 +126,7 @@ func mainPage(msg common.Message, dec *json.Decoder) {
     switch input{
     case 0:
         fmt.Println("Entrando na fila...")
-        common.SendRequest(sendToServer, state, 3)
+        common.SendRequest(sendToServer, 3)
         temp,_:= common.ReadData(dec, &msg)
         switch msg.Action{
         case 0:
@@ -136,7 +136,7 @@ func mainPage(msg common.Message, dec *json.Decoder) {
             fmt.Println("Erro crítico ocorreu")
         }
     case 1:
-        common.SendRequest(sendToServer, state, 4)
+        common.SendRequest(sendToServer, 4)
         println("Loading...")
         common.ReadData(dec, &msg)
         if msg.Action==0 {
@@ -146,7 +146,7 @@ func mainPage(msg common.Message, dec *json.Decoder) {
         }
         p.State = 1
     case 2:
-        common.SendRequest(sendToServer, state, 5)
+        common.SendRequest(sendToServer, 5)
         println("Loading...")
         temp,_:=common.ReadData(dec, &msg)
         fmt.Println("Minhas cartas:", temp)

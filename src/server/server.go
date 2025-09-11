@@ -209,14 +209,14 @@ func handleConnection(conn net.Conn) {
         switch msg.Action {
         case 0:
             temp, err := im.loginPlayer(conn, common.ToInt(inputData[0]))
-            connected = common.SendRequest(encoder, 0, err)
+            connected = common.SendRequest(encoder, err)
             ownPlayer = temp
         case 1:
             temp := im.addPlayer(conn)
-            connected = common.SendRequest(encoder, 0, 1, temp.id)
+            connected = common.SendRequest(encoder, 1, temp.id)
             ownPlayer = temp
         case 2:
-            connected = common.SendRequest(encoder, 0, 0)
+            connected = common.SendRequest(encoder, 0)
         case 3:
             duo := bq.queuePlayer(ownPlayer.id)
             if duo != nil {
@@ -224,14 +224,14 @@ func handleConnection(conn net.Conn) {
                 if enemy.connection != nil {
                     currGame = hg.newGame(ownPlayer.id, enemy.id)
                     enemy.inMsg <- currGame
-                    connected = common.SendRequest(encoder, 0, 0, enemy.id, 1)
+                    connected = common.SendRequest(encoder, 0, enemy.id, 1)
                     
                 }else {
-                    connected = common.SendRequest(encoder, 0, -1)
+                    connected = common.SendRequest(encoder, -1)
                 }
             }else {
                 currGame = <-ownPlayer.inMsg
-                connected = common.SendRequest(encoder, 0, 0, currGame.p1, 2)
+                connected = common.SendRequest(encoder, 0, currGame.p1, 2)
             }
 
         case 4:
@@ -239,9 +239,9 @@ func handleConnection(conn net.Conn) {
             if card!=0 {
                 ownPlayer.cards = append(ownPlayer.cards, card)
             }
-            connected = common.SendRequest(encoder, 0, card)
+            connected = common.SendRequest(encoder, card)
         case 5:
-            connected = common.SendRequestList(encoder, 0, 0, ownPlayer.cards)
+            connected = common.SendRequestList(encoder, 0, ownPlayer.cards)
         case 6:
             
         }

@@ -6,12 +6,11 @@ import (
 )
 
 type Message struct {
-    State  int
     Action int
     Data   json.RawMessage
 }
 
-func SendRequest(encoder *json.Encoder, state int, action int, payload ...int) int {
+func SendRequest(encoder *json.Encoder, action int, payload ...int) int {
 	var data []byte = nil;
 	var err error
 	if payload!=nil {
@@ -25,7 +24,6 @@ func SendRequest(encoder *json.Encoder, state int, action int, payload ...int) i
 
 	req := Message{
 		Action: action,
-        State:  state,
 		Data:   data,
 	}
 
@@ -39,7 +37,7 @@ func SendRequest(encoder *json.Encoder, state int, action int, payload ...int) i
 	return 0
 }
 
-func SendRequestList(encoder *json.Encoder, state int, action int, newpayload []int) int {
+func SendRequestList(encoder *json.Encoder, action int, newpayload []int) int {
 	var data []byte = nil;
 	var err error
 	
@@ -53,7 +51,6 @@ func SendRequestList(encoder *json.Encoder, state int, action int, newpayload []
 
 	req := Message{
 		Action: action,
-        State:  state,
 		Data:   data,
 	}
 
