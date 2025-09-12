@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/Marcelosgc1/ConcorrenciaConectividade_Problema1/common"
+	. "github.com/Marcelosgc1/ConcorrenciaConectividade_Problema1/common"
 )
 
 
@@ -26,9 +26,11 @@ type BattleQueue struct{
 type Player struct{
     connection net.Conn
     id int
-    inMsg chan *Games
+    comGame chan *Games
+    alert chan int
     cards []int
     deck [3]int
+    enc *json.Encoder 
 }
 
 
@@ -38,13 +40,6 @@ type Storage struct{
 }
 
 
-type Games struct{
-    p1 int
-    p2 int
-    point1 int
-    point2 int
-    result int //1 ou 2 p/ vencedor, 3 p/ empate e 0 p/ indefinido
-}
 
 type GameHistory struct{
     mutex sync.Mutex
@@ -55,7 +50,7 @@ type GameHistory struct{
 
 
 
-func (im *IdManager) addPlayer(connect net.Conn) *Player {
+func (im *IdManager) addPlayer(connect net.Conn, encoder *json.Encoder) *Player {
     im.mutex.Lock()
     defer im.mutex.Unlock()
 
@@ -63,36 +58,46 @@ func (im *IdManager) addPlayer(connect net.Conn) *Player {
     im.clientMap[im.count] = &Player{
         connection: connect,
         id: im.count,
-        inMsg: make(chan *Games),
+        comGame: make(chan *Games),
+        alert: make(chan int),
         cards: make([]int, 0),
+        enc: encoder,
     }
 
     return im.clientMap[im.count]
 }
 
-func (im *IdManager) alertPlayer(id int) (*Player, bool) {
+func (im *IdManager) GetPlayer(id int) (*Player) {
     im.mutex.RLock()
     defer im.mutex.RUnlock()
 
-    x,y := im.clientMap[id]
-    return x,y
+    x := im.clientMap[id]
+    return x
 }
 
-func (im *IdManager) loginPlayer(connect net.Conn, login int) (*Player, int) {
+func (im *IdManager) loginPlayer(connect net.Conn, login int, encoder *json.Encoder) (*Player, int) {
     im.mutex.Lock()
     defer im.mutex.Unlock()
+    println("ALGOPORRA")
     if login>im.count {
         return nil, 2
     }
+    println("ALGOPORRA0")
     player, ok := im.clientMap[login]
+    println("ALGOPORRA1")
     if ok && player.connection == nil{
+        println("ALGOPORRA2")
         player.connection = connect
+        player.enc = encoder
+        player.alert = make(chan int)
     }else if player.connection != nil {
+        println("ALGOPORRA3")
         return nil,1
     }else {
+        println("ALGOPORRA4")
         return nil,2
     }
-
+    println("ALGOPORRA5")
     return im.clientMap[login], 0
 }
 
@@ -126,20 +131,23 @@ func (sto *Storage) openPack() int {
 
 func (hg *GameHistory) newGame(p1id int, p2id int) *Games {
     hg.mutex.Lock()
-    defer sto.mutex.Unlock()
+    defer hg.mutex.Unlock()
     fmt.Println(sto.cards)
     newGame := Games{
-        p1: p1id, p2: p2id, point1: 0, point2: 0,result: 0,
+        P1: p1id, P2: p2id, Point1: 0, Point2: 0,
     }
     hg.allGames = append(hg.allGames, &newGame)
     return &newGame
 }
 
 
-func setupPacks() []int {
-    arr := []int{1, 2, 3, 4, 5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26}
+func setupPacks(N int) []int {
+    arr := make([]int, N)
+    for i := 0; i < N; i++ {
+        arr[i] = i + 1
+    }
 
-    for i := len(arr) - 1; i > 0; i-- {
+    for i := N - 1; i > 0; i-- {
         j := rand.Intn(i + 1)
         arr[i], arr[j] = arr[j], arr[i]
     }
@@ -147,6 +155,8 @@ func setupPacks() []int {
     fmt.Println(arr)
     return arr
 }
+
+
 
 var im = IdManager{
         count: 0,
@@ -158,7 +168,7 @@ var bq = BattleQueue{
 }
 
 var sto = Storage{
-    cards: setupPacks(),
+    cards: setupPacks(50),
 }
     
 var hg = GameHistory{
@@ -190,56 +200,71 @@ func main() {
 
 func handleConnection(conn net.Conn) {
     
-    var msg common.Message
+    var msg Message
     decoder := json.NewDecoder(conn)
     encoder := json.NewEncoder(conn)
     var connected = 0
-    var ownPlayer *Player
+    var ownPlayer *Player = nil
     var inputData []any
-    var currGame *Games
+    var currGame *Games = nil
 
     defer func() {
         if ownPlayer!=nil {
             ownPlayer.connection = nil
         }
-        //fmt.Println(im.clientMap[ownPlayer.id].connection)
+        if currGame!=nil {
+            var id int
+            if currGame.P1 == ownPlayer.id{
+                id = currGame.P2
+            }else {
+                id = currGame.P1
+            }
+            im.GetPlayer(id).alert <- 99
+        }
+        if ownPlayer != nil {
+            fmt.Println("Player",ownPlayer.id,"desconectado")
+        }else {
+            fmt.Println("Player sem ID desconectado")
+        }
         conn.Close()
     }()
     
     for {
-        inputData, connected = common.ReadData(decoder, &msg)
+        inputData, connected = ReadData(decoder, &msg)
         if connected!=0 {
             break
         }
         switch msg.Action {
         case 0:
-            temp, err := im.loginPlayer(conn, common.ToInt(inputData[0]))
-            connected = common.SendRequest(encoder, err)
+            fmt.Println("LOGIN_PAGE")
+            temp, err := im.loginPlayer(conn, ToInt(inputData[0]), encoder)
+            fmt.Println("LOGIN_PAGE2")
+            connected = SendRequest(encoder, err)
+            fmt.Println("LOGIN_PAGE3")
             ownPlayer = temp
         case 1:
-            temp := im.addPlayer(conn)
-            connected = common.SendRequest(encoder, 1, temp.id)
+            temp := im.addPlayer(conn, encoder)
+            connected = SendRequest(encoder, 1, temp.id)
             ownPlayer = temp
         case 2:
-            connected = common.SendRequest(encoder, 0)
+            connected = SendRequest(encoder, 0)
         case 3:
             duo := bq.queuePlayer(ownPlayer.id)
             if duo != nil {
-                enemy,_ := im.alertPlayer(duo[0])
+                enemy := im.GetPlayer(duo[0])
                 if enemy.connection != nil && currGame == nil {
                     currGame = hg.newGame(ownPlayer.id, enemy.id)
-                    enemy.inMsg <- currGame
-                    connected = common.SendRequest(encoder, 0, enemy.id, 1)
-                    
+                    enemy.comGame <- currGame
+                    connected = SendRequest(encoder, 0, enemy.id, 1)
                 }else {
-                    connected = common.SendRequest(encoder, -1)
+                    connected = SendRequest(encoder, -1)
                 }
             }else {
-                currGame = <-ownPlayer.inMsg
+                currGame = <-ownPlayer.comGame
                 if currGame == nil {
-                    connected = common.SendRequest(encoder, -1)
+                    connected = SendRequest(encoder, -1)
                 }else {
-                    connected = common.SendRequest(encoder, 0, currGame.p1, 2)
+                    connected = SendRequest(encoder, 0, currGame.P1, 2)
                 }
                 
             }
@@ -249,17 +274,67 @@ func handleConnection(conn net.Conn) {
             if card!=0 {
                 ownPlayer.cards = append(ownPlayer.cards, card)
             }
-            connected = common.SendRequest(encoder, card)
+            connected = SendRequest(encoder, card)
         case 5:
-            connected = common.SendRequestList(encoder, 0, ownPlayer.cards)
+            connected = SendRequestList(encoder, 0, ownPlayer.cards)
         case 6:
-            if len(ownPlayer.cards) <= common.ToInt(inputData[1]){
-                connected = common.SendRequest(encoder, 0, -1)
+            if len(ownPlayer.cards) <= ToInt(inputData[1]){
+                connected = SendRequest(encoder, 0, -1)
                 break
             }
-            ownPlayer.deck[common.ToInt(inputData[0])] = ownPlayer.cards[common.ToInt(inputData[1])]
+            ownPlayer.deck[ToInt(inputData[0])] = ownPlayer.cards[ToInt(inputData[1])]
         case 7:
-            connected = common.SendRequestList(encoder, 0, ownPlayer.deck[:])
+            connected = SendRequestList(encoder, 0, ownPlayer.deck[:])
+        case 8:
+            if currGame==nil {
+                SendRequest(encoder, -1)
+                break
+            }
+            im.GetPlayer(currGame.P2).alert <- ToInt(inputData[0])
+            result := <- ownPlayer.alert
+            SendRequest(encoder, result)
+            if result == 3 || result == 0 {
+                currGame = nil
+            }
+         
+        case 9:
+            if currGame==nil {
+                SendRequest(encoder, -1)
+                break
+            }
+            var result int
+            enemyCard := <-ownPlayer.alert
+            if enemyCard == 99 {
+                SendRequest(encoder, 99)
+            }else {
+                if enemyCard>ToInt(inputData[0]) {
+                    currGame.Point1 += 3
+                    if currGame.Point1 > 3 {
+                        result = 0
+                    }else {
+                        result = 1
+                    }
+                }else {
+                    currGame.Point2 += 3
+                    if currGame.Point2 > 3 {
+                        result = 3
+                    }else {
+                        result = 2
+                    }
+                }
+                im.GetPlayer(currGame.P1).alert <- 3 - result
+                SendRequest(encoder, result)
+                if result == 3 || result == 0 {
+                    currGame = nil
+                }
+            }
+
+        case 10:
+            if currGame != nil {
+                SendRequest(encoder, 0, currGame.P1, currGame.Point1, currGame.P2, currGame.Point2)
+            }else {
+                SendRequest(encoder, -1)
+            }
         }
         
         if connected != 0 {

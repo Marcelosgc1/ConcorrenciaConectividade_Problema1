@@ -5,6 +5,13 @@ import (
 	"fmt"
 )
 
+type Games struct{
+    P1 int
+    P2 int
+    Point1 int
+    Point2 int
+}
+
 type Message struct {
     Action int
     Data   json.RawMessage

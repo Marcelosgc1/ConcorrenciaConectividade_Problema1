@@ -14,6 +14,8 @@ import (
 
 type Player struct{
     State int
+    Turn int
+    Deck [3]int
 }
 type Game struct{
     active bool
@@ -23,7 +25,7 @@ type Game struct{
 var state = 0
 var sendToServer *json.Encoder
 
-var p = Player{State: 0,}
+var p = Player{State: 0, Turn: 0}
 var g = Game{active: false, enemyId: 0,}
 
 
@@ -62,10 +64,8 @@ func main() {
             mainPage(msg, readFromServer)
         case 2:
             println("====GAME START====")
-            p.State = 1
+            //p.State = 1
             gamePage(msg, readFromServer)
-        case 3:
-            println("SELECIONE 3 CARTAS!")
         }
         if p.State == -1 {
             break
@@ -122,26 +122,40 @@ func login(msg common.Message, dec *json.Decoder) {
 
 func mainPage(msg common.Message, dec *json.Decoder) {
     var input int
+    var erro int
     n, err := fmt.Scanln(&input)
     if err != nil || n == 0 {
         return
     }
 
     switch input{
-    case 0:
+    case 0: //battle
         fmt.Println("Entrando na fila...")
-        common.SendRequest(sendToServer, 7)
-        deck,_:= common.ReadData(dec, &msg)
-        if common.ToInt(deck[0])==0 || common.ToInt(deck[1])==0 || common.ToInt(deck[2])==0 {
+        if erro=common.SendRequest(sendToServer, 7); erro != 0{
+            p.State = -1
+            break
+        }
+        var deck[]any
+        if deck,erro = common.ReadData(dec, &msg); erro != 0{
+            p.State = -1
+            break
+        }
+        p.Deck[0] = common.ToInt(deck[0])
+        p.Deck[1] = common.ToInt(deck[1])
+        p.Deck[2] = common.ToInt(deck[2])
+
+        if p.Deck[0]==0 || p.Deck[1]==0 || p.Deck[2]==0 {
             fmt.Println("Monte seu deck antes de jogar!")
             break
         }
         common.SendRequest(sendToServer, 3)
         temp,_:= common.ReadData(dec, &msg)
+        fmt.Println()
         switch msg.Action{
         case 0:
             fmt.Println("Partida encontrada contra o jogador: ", common.ToInt(temp[0]), "! Segure seus cintos...")
             p.State = 2
+            p.Turn = common.ToInt(temp[1])
         case -1:
             fmt.Println("Erro crítico ocorreu")
         }
@@ -184,7 +198,7 @@ func mainPage(msg common.Message, dec *json.Decoder) {
             if err != nil || n == 0 {
                 return
             }
-            if cards>=len(temp) {
+            if cards>=len(temp) || cards<0 {
                 fmt.Println("Indice invalido")
                 continue
             }else if temp[cards]==-1 {
@@ -194,9 +208,7 @@ func mainPage(msg common.Message, dec *json.Decoder) {
                 common.SendRequest(sendToServer, 6, deck, cards)
                 deck += 1
             }
-        }
-
-        
+        }        
     case 5:
         p.State = -1
     case 6:
@@ -207,20 +219,68 @@ func mainPage(msg common.Message, dec *json.Decoder) {
 
 
 func gamePage(msg common.Message, dec *json.Decoder) {
-    var input int
-    n, err := fmt.Scanln(&input)
-    if err != nil || n == 0 {
-        return
-    }
+    gameCards := p.Deck
 
-    switch input{
-    case 0:
-        
-    case 1:
+    var input, value, flag0, flag1 int
 
-    case 2:
-        
-    case 3:
-        p.State = -1
+
+    for flag0 == 0{
+        println("0 p/ jogar uma carta")
+        println("1 p/ ver o placar")
+        n, err := fmt.Scanln(&input)
+        if err != nil || n == 0 {
+            return
+        }
+        flag1 = 0
+        switch input{
+        case 0: //escolher carta
+            for flag1 == 0{
+                fmt.Println("Escolha uma carta (pelo índice)!")
+                fmt.Println(gameCards)
+                n, err := fmt.Scanln(&value)
+                if err != nil || n == 0 {
+                    return
+                }
+                
+                if (value>2 || value<0) {
+                    fmt.Println("Escolha uma carta válida")
+                }else if gameCards[value]==-1{
+                    fmt.Println("Escolha uma carta válida 2")
+                }else {
+                    flag1 = 1
+                    myCard := gameCards[value]
+                    gameCards[value] = -1
+                    common.SendRequest(sendToServer, p.Turn+7, myCard)
+                    common.ReadData(dec, &msg)
+                    switch msg.Action {
+                    case 99:
+                        fmt.Println("Você venceu por desistência!!")
+                        p.State = 1
+                        flag0 = 1
+                    case 3:
+                        fmt.Println("Você venceu do adversário!!")
+                        p.State = 1
+                        flag0 = 1
+                    case 2:
+                        fmt.Println("Você venceu esta rodada!!")
+                    case 1:
+                        fmt.Println("Você perdeu esta rodada :(")
+                    case 0:
+                        fmt.Println("Você perdeu o jogo :(")
+                        p.State = 1
+                        flag0 = 1
+                    }
+                }
+            }
+
+        case 1: //mostrar placar
+            common.SendRequest(sendToServer, 10)
+            temp,_:=common.ReadData(dec, &msg)
+            fmt.Println("Jogador", temp[0],":",temp[1], "pontos")
+            fmt.Println("Jogador", temp[2],":",temp[3], "pontos")
+
+        // case 2: //desistir
+        //     common.SendRequest(sendToServer, 10)
+        }
     }
 }
