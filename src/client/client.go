@@ -17,22 +17,16 @@ type Player struct{
     Turn int
     Deck [3]int
 }
-type Game struct{
-    active bool
-    enemyId int
-}
 
-var state = 0
 var sendToServer *json.Encoder
 
 var p = Player{State: 0, Turn: 0}
-var g = Game{active: false, enemyId: 0,}
 
 
 
 func main() {
 
-    conn, err := net.Dial("tcp", "localhost:8080")
+    conn, err := net.Dial("tcp", "172.65.213.161:8080")
     
     if err != nil {
         fmt.Println("Erro ao conectar:", err)
