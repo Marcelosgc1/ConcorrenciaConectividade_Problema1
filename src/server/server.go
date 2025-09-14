@@ -78,26 +78,21 @@ func (im *IdManager) GetPlayer(id int) (*Player) {
 func (im *IdManager) loginPlayer(connect net.Conn, login int, encoder *json.Encoder) (*Player, int) {
     im.mutex.Lock()
     defer im.mutex.Unlock()
-    println("ALGOPORRA")
     if login>im.count {
         return nil, 2
     }
-    println("ALGOPORRA0")
     player, ok := im.clientMap[login]
-    println("ALGOPORRA1")
-    if ok && player.connection == nil{
-        println("ALGOPORRA2")
+    if !ok {
+        return nil, 2
+    }else if player.connection == nil{
         player.connection = connect
         player.enc = encoder
         player.alert = make(chan int)
     }else if player.connection != nil {
-        println("ALGOPORRA3")
         return nil,1
     }else {
-        println("ALGOPORRA4")
         return nil,2
     }
-    println("ALGOPORRA5")
     return im.clientMap[login], 0
 }
 
@@ -120,7 +115,7 @@ func (bq *BattleQueue) queuePlayer(id int) []int{
 func (sto *Storage) openPack() int {
     sto.mutex.Lock()
     defer sto.mutex.Unlock()
-    fmt.Println(sto.cards)
+    //fmt.Println(sto.cards)
     if len(sto.cards) <= 0 {
         return 0
     }
@@ -132,7 +127,7 @@ func (sto *Storage) openPack() int {
 func (hg *GameHistory) newGame(p1id int, p2id int) *Games {
     hg.mutex.Lock()
     defer hg.mutex.Unlock()
-    fmt.Println(sto.cards)
+    //fmt.Println(sto.cards)
     newGame := Games{
         P1: p1id, P2: p2id, Point1: 0, Point2: 0,
     }
@@ -168,7 +163,7 @@ var bq = BattleQueue{
 }
 
 var sto = Storage{
-    cards: setupPacks(50),
+    cards: setupPacks(2000),
 }
     
 var hg = GameHistory{
@@ -185,6 +180,7 @@ func main() {
     defer listener.Close()
     fmt.Println("Servidor iniciado na porta 8080...")
 
+    var count int
     for {
         conn, err := listener.Accept()
         if err != nil {
@@ -193,7 +189,9 @@ func main() {
         }
         fmt.Println("Novo cliente conectado!")
         
+        count+=1
         go handleConnection(conn)
+        println(count)
         
     }
 }
@@ -219,7 +217,7 @@ func handleConnection(conn net.Conn) {
             }else {
                 id = currGame.P1
             }
-            im.GetPlayer(id).alert <- 99
+            im.GetPlayer(id).alert <- -99
         }
         if ownPlayer != nil {
             fmt.Println("Player",ownPlayer.id,"desconectado")
@@ -236,12 +234,16 @@ func handleConnection(conn net.Conn) {
         }
         switch msg.Action {
         case 0:
-            fmt.Println("LOGIN_PAGE")
-            temp, err := im.loginPlayer(conn, ToInt(inputData[0]), encoder)
-            fmt.Println("LOGIN_PAGE2")
-            connected = SendRequest(encoder, err)
-            fmt.Println("LOGIN_PAGE3")
-            ownPlayer = temp
+            if ownPlayer==nil {
+                connected = SendRequest(encoder, 1)
+            }else {
+                fmt.Println("LOGIN_PAGE")
+                temp, err := im.loginPlayer(conn, ToInt(inputData[0]), encoder)
+                fmt.Println("LOGIN_PAGE2")
+                connected = SendRequest(encoder, err)
+                fmt.Println("LOGIN_PAGE3")
+                ownPlayer = temp                
+            }
         case 1:
             temp := im.addPlayer(conn, encoder)
             connected = SendRequest(encoder, 1, temp.id)
@@ -249,6 +251,10 @@ func handleConnection(conn net.Conn) {
         case 2:
             connected = SendRequest(encoder, 0)
         case 3:
+            if ownPlayer==nil {
+                connected = SendRequest(encoder, -1)
+                break
+            }
             duo := bq.queuePlayer(ownPlayer.id)
             if duo != nil {
                 enemy := im.GetPlayer(duo[0])
@@ -270,6 +276,10 @@ func handleConnection(conn net.Conn) {
             }
 
         case 4:
+            if ownPlayer==nil {
+                connected = SendRequest(encoder, 0)
+                break
+            }
             card := sto.openPack()
             if card!=0 {
                 ownPlayer.cards = append(ownPlayer.cards, card)
@@ -278,12 +288,20 @@ func handleConnection(conn net.Conn) {
         case 5:
             connected = SendRequestList(encoder, 0, ownPlayer.cards)
         case 6:
+            if ownPlayer==nil {
+                SendRequest(encoder, 0, -1)
+                break
+            }
             if len(ownPlayer.cards) <= ToInt(inputData[1]){
                 connected = SendRequest(encoder, 0, -1)
                 break
             }
             ownPlayer.deck[ToInt(inputData[0])] = ownPlayer.cards[ToInt(inputData[1])]
         case 7:
+            if ownPlayer == nil{
+                connected = SendRequestList(encoder, 0, nil)
+                break
+            }
             connected = SendRequestList(encoder, 0, ownPlayer.deck[:])
         case 8:
             if currGame==nil {
@@ -304,8 +322,8 @@ func handleConnection(conn net.Conn) {
             }
             var result int
             enemyCard := <-ownPlayer.alert
-            if enemyCard == 99 {
-                SendRequest(encoder, 99)
+            if enemyCard == -99 {
+                SendRequest(encoder, -99)
             }else {
                 if enemyCard>ToInt(inputData[0]) {
                     currGame.Point1 += 3

@@ -26,7 +26,7 @@ var p = Player{State: 0, Turn: 0}
 
 func main() {
 
-    conn, err := net.Dial("tcp", "172.65.213.161:8080")
+    conn, err := net.Dial("tcp", "localhost:8080")
     
     if err != nil {
         fmt.Println("Erro ao conectar:", err)
@@ -101,7 +101,8 @@ func login(msg common.Message, dec *json.Decoder) {
     case 1:
         common.SendRequest(sendToServer, 1)
         println("Loading...")
-        temp,_ := common.ReadData(dec, &msg)
+        temp,t := common.ReadData(dec, &msg)
+        println(t)
         fmt.Println("Usuário criado:", common.ToInt(temp[0]))
         p.State = 1
     case 2:
