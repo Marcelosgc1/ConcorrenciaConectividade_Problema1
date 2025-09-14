@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: ./
+      dockerfile: Dockerfile.server
+    container_name: pbl_server
+    ports:
+      - "8080:8080"
+
+  stress:
+    build:
+      context: ./
+      dockerfile: Dockerfile.stress
+    container_name: pbl_stress
+    depends_on:
+      - server

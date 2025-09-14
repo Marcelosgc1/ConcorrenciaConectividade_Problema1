@@ -26,7 +26,7 @@ var p = Player{State: 0, Turn: 0}
 
 func main() {
 
-    conn, err := net.Dial("tcp", "localhost:8080")
+    conn, err := net.Dial("tcp", "192.168.0.11:8080")
     
     if err != nil {
         fmt.Println("Erro ao conectar:", err)
@@ -248,7 +248,7 @@ func gamePage(msg common.Message, dec *json.Decoder) {
                     common.SendRequest(sendToServer, p.Turn+7, myCard)
                     common.ReadData(dec, &msg)
                     switch msg.Action {
-                    case 99:
+                    case -99:
                         fmt.Println("Você venceu por desistência!!")
                         p.State = 1
                         flag0 = 1

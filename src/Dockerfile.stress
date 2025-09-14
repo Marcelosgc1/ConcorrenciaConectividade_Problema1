@@ -1,0 +1,11 @@
+FROM golang:1.24.5
+
+WORKDIR /app
+
+COPY go.mod ./
+RUN go mod download
+
+COPY . .
+
+# Rodar os testes (exemplo: na pasta ./test)
+CMD ["go", "test", "./test", "-v"]
