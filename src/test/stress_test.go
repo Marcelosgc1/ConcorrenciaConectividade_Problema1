@@ -7,8 +7,19 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+)
+
+var (
+    connectErrs int32
+    createErrs  int32
+    openErrs    int32
+    deckErrs    int32
+    queueErrs   int32
+    playErrs    int32
+    respErrs    int32
 )
 
 type Message struct {
@@ -57,6 +68,7 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		fmt.Printf("worker %d: fail to connect: %v\n", id, err)
+		atomic.AddInt32(&connectErrs, 1)
 		return
 	}
 	defer conn.Close()
@@ -73,6 +85,7 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 	if mode == "create-only" || mode == "create-and-open" {
 		if err := sendRequest(enc, 1); err != nil {
 			fmt.Printf("%s: send create request error: %v\n", workerTag, err)
+			atomic.AddInt32(&createErrs, 1)
 			return
 		}
 		resp, _, err := readResponse(dec)
@@ -114,6 +127,7 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 			_, msg, err := readResponse(dec)
 			if err != nil {
 				fmt.Printf("%s: read open pack response error: %v\n", workerTag, err)
+				atomic.AddInt32(&openErrs, 1)
 				return
 			}
 			// best-effort: server encodes card id in Message.Action (observed behavior)
@@ -131,6 +145,7 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 		for slot := 0; slot < 3; slot++ {
 			if err := sendRequest(enc, 6, slot, slot); err != nil {
 				fmt.Printf("%s: send set deck error: %v\n", workerTag, err)
+				atomic.AddInt32(&deckErrs, 1)
 			} else {
 				// server typically responds with status action code or similar; read it
 				// _, _, err := readResponse(dec)
@@ -150,14 +165,11 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 	// queue for battle (action 3)
 	if err := sendRequest(enc, 3); err != nil {
 		fmt.Printf("%s: send queue error: %v\n", workerTag, err)
+		atomic.AddInt32(&deckErrs, 1)
 	} else {
 		fmt.Printf("%s: queued for battle\n", workerTag)
-		resp, b, _ := readResponse(dec)
-		println("aaa ", b.Action)
+		resp, _, _ := readResponse(dec)
 		playerID = int(resp[1].(float64))
-		if playerID!=1 && playerID!=2 {
-			fmt.Println("AAAAAAAAAAAAAPQPPPP", playerID)
-		}
 	}
 
 	// wait a bit for matchmaking and then attempt to play cards.
@@ -168,12 +180,14 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 		// send card id as action (best-effort play)
 		if err := sendRequest(enc, playerID+7, card); err != nil {
 			fmt.Printf("%s: send play card %d err: %v\n", workerTag, card, err)
+			atomic.AddInt32(&playErrs, 1)
 			continue
 		}
 		// read server response about the play (if any)
 		_, msg, err := readResponse(dec)
 		if err != nil {
 			fmt.Printf("%s: read play response err: %v\n", workerTag, err)
+			atomic.AddInt32(&respErrs, 1)
 		} else {
 			fmt.Printf("%s: played card %d -> server action=%d\n", workerTag, card, msg.Action)
 		}
@@ -181,7 +195,6 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 		if msg.Action==3 || msg.Action==0 {
 			break
 		}
-		println("oi")
 	}
 
 	// short sleep to keep connection open a tiny bit
@@ -204,5 +217,14 @@ func TestMain(t *testing.T) {
 		go worker(i, *host, *port, *mode, &wg)
 	}
 	wg.Wait()
-	fmt.Printf("Completed: took %v\n", time.Since(start))
+	fmt.Println("---- Stress Test Summary ----")
+	fmt.Printf("Workers: %d, Duration: %v\n", *concurrency, time.Since(start))
+	fmt.Printf("Connect errors: %d\n", connectErrs)
+	fmt.Printf("Create errors : %d\n", createErrs)
+	fmt.Printf("Open errors   : %d\n", openErrs)
+	fmt.Printf("Deck errors   : %d\n", deckErrs)
+	fmt.Printf("Queue errors  : %d\n", queueErrs)
+	fmt.Printf("Play errors   : %d\n", playErrs)
+	fmt.Printf("Resp errors   : %d\n", respErrs)
+	fmt.Println("------------------------------")
 }
