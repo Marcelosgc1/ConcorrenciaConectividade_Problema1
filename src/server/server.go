@@ -304,7 +304,12 @@ func handleConnection(conn net.Conn) {
                 SendRequest(encoder, -1)
                 break
             }
-            im.GetPlayer(currGame.P2).alert <- ToInt(inputData[0])
+            enemy:=im.GetPlayer(currGame.P2)
+            if enemy.connection==nil {
+                SendRequest(encoder, -99)
+                break
+            }
+            enemy.alert <- ToInt(inputData[0])
             result := <- ownPlayer.alert
             SendRequest(encoder, result)
             if result == 3 || result == 0 {
@@ -314,6 +319,11 @@ func handleConnection(conn net.Conn) {
         case 9:
             if currGame==nil {
                 SendRequest(encoder, -1)
+                break
+            }
+            enemy:=im.GetPlayer(currGame.P2)
+            if enemy.connection==nil {
+                SendRequest(encoder, -99)
                 break
             }
             var result int
@@ -336,7 +346,7 @@ func handleConnection(conn net.Conn) {
                         result = 2
                     }
                 }
-                im.GetPlayer(currGame.P1).alert <- 3 - result
+                enemy.alert <- 3 - result
                 SendRequest(encoder, result)
                 if result == 3 || result == 0 {
                     currGame = nil

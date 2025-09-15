@@ -26,7 +26,7 @@ var p = Player{State: 0, Turn: 0}
 
 func main() {
 
-    conn, err := net.Dial("tcp", "172.16.103.12:8080")
+    conn, err := net.Dial("tcp", "localhost:8080")
     
     if err != nil {
         fmt.Println("Erro ao conectar:", err)
