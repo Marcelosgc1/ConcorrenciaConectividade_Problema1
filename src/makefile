@@ -34,7 +34,7 @@ run-server:
 	docker run --name $(SERVER_CONTAINER) -p 8080:8080 $(SERVER_IMAGE)
 
 run-client:
-	docker run --name $(CLIENT_CONTAINER) $(CLIENT_IMAGE)
+	docker run -it --name $(CLIENT_CONTAINER) $(CLIENT_IMAGE)
 
 run-stress:
 	docker run --name $(STRESS_CONTAINER) $(STRESS_IMAGE)

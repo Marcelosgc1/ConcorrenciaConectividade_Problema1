@@ -234,16 +234,12 @@ func handleConnection(conn net.Conn) {
         }
         switch msg.Action {
         case 0:
-            if ownPlayer==nil {
-                connected = SendRequest(encoder, 1)
-            }else {
-                fmt.Println("LOGIN_PAGE")
-                temp, err := im.loginPlayer(conn, ToInt(inputData[0]), encoder)
-                fmt.Println("LOGIN_PAGE2")
-                connected = SendRequest(encoder, err)
-                fmt.Println("LOGIN_PAGE3")
-                ownPlayer = temp                
-            }
+            fmt.Println("LOGIN_PAGE")
+            temp, err := im.loginPlayer(conn, ToInt(inputData[0]), encoder)
+            fmt.Println("LOGIN_PAGE2")
+            connected = SendRequest(encoder, err)
+            fmt.Println("LOGIN_PAGE3")
+            ownPlayer = temp                
         case 1:
             temp := im.addPlayer(conn, encoder)
             connected = SendRequest(encoder, 1, temp.id)

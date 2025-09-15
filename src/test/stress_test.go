@@ -202,7 +202,7 @@ func worker(id int, host string, port int, mode string, wg *sync.WaitGroup) {
 }
 
 func TestMain(t *testing.T) {
-	host := flag.String("host", "server", "server host")
+	host := flag.String("host", "172.16.103.12", "server host")
 	port := flag.Int("port", 8080, "server port")
 	concurrency := flag.Int("concurrency", 200, "number of concurrent workers")
 	mode := flag.String("mode", "create-and-open", "mode: create-only | open-only | create-and-open | login-only")
