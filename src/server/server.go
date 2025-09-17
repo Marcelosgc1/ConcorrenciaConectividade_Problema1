@@ -321,7 +321,7 @@ func handleConnection(conn net.Conn) {
                 SendRequest(encoder, -1)
                 break
             }
-            enemy:=im.GetPlayer(currGame.P2)
+            enemy:=im.GetPlayer(currGame.P1)
             if enemy.connection==nil {
                 SendRequest(encoder, -99)
                 break
